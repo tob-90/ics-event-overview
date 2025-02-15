@@ -3,6 +3,8 @@
 ## Description
 This Python script regularly checks ICS calendar files for changes and sends notifications via email if new events are added, existing events are modified, or removed. The script supports both German and English languages. It is particularly designed for shared calendars, ensuring that all participants stay informed about updates in a structured and automated way. It was specifically developed for Radicale (https://radicale.org/), but it also works with other services such as Google Calendar. 
 
+![calendar_overview](https://github.com/user-attachments/assets/9b8e4351-7faf-48b4-89d0-99218ceb8bca)
+
 ## Features
 - Automatically retrieves events from ICS files
 - Comparison of the current and previous versions of the calendar
