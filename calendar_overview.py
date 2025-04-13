@@ -43,6 +43,8 @@ texts = {
         'event': "Termin:",
         'start': "Start:",
         'end': "Ende:",
+        'location': "Ort:",
+        'changes': "Änderungen:",
         'footer': "Diese E-Mail wurde automatisch generiert. Bitte nicht antworten."
     },
     'EN': {
@@ -54,12 +56,20 @@ texts = {
         'event': "Event:",
         'start': "Start:",
         'end': "End:",
+        'location': "Location:",
+        'changes': "Changes:",
         'footer': "This email was automatically generated. Please do not reply."
     }
 }
 
 # Wähle die Texte basierend auf der Sprache aus
 selected_texts = texts.get(language, texts['EN'])  # Fallback auf Englisch, wenn die Sprache nicht gefunden wird
+field_labels = {
+    'SUMMARY': selected_texts['event'].replace(':', ''),
+    'DTSTART': selected_texts['start'].replace(':', ''),
+    'DTEND': selected_texts['end'].replace(':', ''),
+    'LOCATION': selected_texts['location'].replace(':', '')
+}
 
 # Funktion zum Herunterladen der ICS-Datei
 def download_ics(url, path):
@@ -72,54 +82,50 @@ def read_ics(path):
     with open(path, 'rb') as file:
         return Calendar.from_ical(file.read())
 
+# Funktion zum Lokalisieren von Datumsangaben
+def localize_datetime(dt):
+    if isinstance(dt, date) and not isinstance(dt, datetime):
+        dt = datetime.combine(dt, datetime.min.time())
+    return dt if dt.tzinfo else pytz.timezone(local_timezone).localize(dt)
+
 # Funktion zum Extrahieren von Event-Details
 def extract_event_details(event):
-    start = event.get('DTSTART').dt
-    end = event.get('DTEND').dt if event.get('DTEND') else None
-
-    # Convert start and end to datetime if they are date
-    if isinstance(start, date) and not isinstance(start, datetime):
-        start = datetime.combine(start, datetime.min.time())
-    if isinstance(end, date) and not isinstance(end, datetime):
-        end = datetime.combine(end, datetime.min.time())
-
-    # Localize to the specified timezone if naive datetime
-    if isinstance(start, datetime) and start.tzinfo is None:
-        start = pytz.timezone(local_timezone).localize(start)
-    if isinstance(end, datetime) and end.tzinfo is None:
-        end = pytz.timezone(local_timezone).localize(end)
-
-    summary = event.get('SUMMARY')
-    location = event.get('LOCATION')
-    
     return {
-        'start': start,
-        'end': end,
-        'summary': summary,
-        'location': location
+        'start': localize_datetime(event.get('DTSTART').dt),
+        'end': localize_datetime(event.get('DTEND').dt if event.get('DTEND') else None),
+        'summary': event.get('SUMMARY'),
+        'location': event.get('LOCATION')
     }
 
+# Funktion zum Formatieren der Events-Liste
+def format_events(events, changes=None):
+    return ''.join(
+        format_event_details(extract_event_details(event), changes[i] if changes else [])
+        + ('<hr size="1" />' if i < len(events) - 1 else '')
+        for i, event in enumerate(events)
+    )
+
 # Funktion zum Formatieren von Event-Details
-def format_event_details(event):
+def format_event_details(event, changes):
     start = event['start'].astimezone(pytz.timezone(local_timezone)).strftime(DATE_FORMAT)
     end = event['end'].astimezone(pytz.timezone(local_timezone)).strftime(DATE_FORMAT) if event['end'] else 'N/A'
     summary = event['summary']
     location = event['location'] if event['location'] else 'N/A'
     
+    change_text = ''
+    if changes:
+        change_text = f'<div style="padding-left: 20px;"><span class="symbol">✏️</span><i><strong>{selected_texts["changes"]}</strong> {", ".join(changes)}</i></div>'
+
+    location_text = ''
+    if location != 'N/A':
+        location_text = f'<div style="padding-left: 20px;"><span class="symbol">📍</span><strong>{selected_texts["location"]}</strong>&nbsp;<span>{location}</span></div>'
     return (f'<div style="padding-left: 20px;"><span class="symbol">📅</span><strong>{selected_texts["event"]}</strong>&nbsp;<span>{summary}</span></div>'
             f'<div style="padding-left: 20px;"><span class="symbol">⏰</span><strong>{selected_texts["start"]}</strong>&nbsp;<span>{start}</span></div>'
-            f'<div style="padding-left: 20px;"><span class="symbol">⏰</span><strong>{selected_texts["end"]}</strong>&nbsp;<span>{end}</span></div>')
+            f'<div style="padding-left: 20px;"><span class="symbol">⏰</span><strong>{selected_texts["end"]}</strong>&nbsp;<span>{end}</span></div>'
+            f'{location_text}'
+            f'{change_text}')
 
-# Funktion zum Formatieren der Events-Liste
-def format_events(events):
-    formatted_events = []
-    for i, event in enumerate(events):
-        details = extract_event_details(event)
-        formatted_event = format_event_details(details)
-        if i < len(events) - 1:
-            formatted_event += '<hr size="1" />'
-        formatted_events.append(formatted_event)
-    return ''.join(formatted_events)
+
 
 # Funktion zum Generieren des E-Mail-Bodys
 def generate_email_body(added, removed, modified):
@@ -128,7 +134,7 @@ def generate_email_body(added, removed, modified):
 
     added_events = f"<h3>{selected_texts['added']}</h3>{format_events(added)}" if added else ""
     removed_events = f"<h3>{selected_texts['removed']}</h3>{format_events(removed)}" if removed else ""
-    modified_events = f"<h3>{selected_texts['modified']}</h3>{format_events(modified)}" if modified else ""
+    modified_events = f"<h3>{selected_texts['modified']}</h3>{format_events([e['event'] for e in modified], [e['changes'] for e in modified])}" if modified else ""
 
     body = template.replace("{{lang}}", "de" if language == "DE" else "en")\
                    .replace("{{header}}", selected_texts['header'])\
@@ -189,18 +195,18 @@ def compare_calendars(old_cal, new_cal):
 
     added = [e for uid, e in new_events.items() if uid not in old_events]
     removed = [e for uid, e in old_events.items() if uid not in new_events]
-    modified = [new_events[uid] for uid in new_events if uid in old_events and not events_are_equal(old_events[uid], new_events[uid])]
+    modified = []
+    for uid in new_events:
+        if uid in old_events:
+            changes = events_are_equal(old_events[uid], new_events[uid])
+            if changes:
+                modified.append({'event': new_events[uid], 'changes': changes})
 
     return added, removed, modified
 
-def events_are_equal(event1, event2):
-    fields_to_compare = ['SUMMARY', 'DTSTART', 'DTEND', 'LOCATION']
-    for field in fields_to_compare:
-        if event1.get(field) != event2.get(field):
-            print(f"Event {event1.get('UID')} differs in field {field}")
-            print(f"Old value: {event1.get(field)}, New value: {event2.get(field)}")
-            return False
-    return True
+# Funktion zum Vergleichen der Events
+def events_are_equal(event1, event2):  
+    return [field_labels[field] for field in ['SUMMARY', 'DTSTART', 'DTEND', 'LOCATION'] if event1.get(field) != event2.get(field)]
 
 # Hauptfunktion
 def main():
