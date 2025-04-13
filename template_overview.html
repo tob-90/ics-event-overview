@@ -3,18 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <style>
-    		:root {
-    			  color-scheme: light;
-    		}	
+	:root {
+	    color-scheme: dark;
+	}	
         body {
             font-family: Arial, sans-serif;
-			      color: #000000;
-            background-color: #f4f4f4;
             margin: 0;
             padding: 0;
         }
         .container {
-            background-color: #ffffff;
+            background-color: #E9E9E9;
             margin: 50px auto;
             padding: 20px;
             max-width: 600px;
@@ -23,7 +21,7 @@
             word-wrap: break-word;
         }
         .header {
-            background-color: #007BFF;
+            background-color: #0056b3;
             color: #ffffff;
             padding: 1px 0;
             text-align: center;
@@ -33,7 +31,7 @@
             padding-left: 20px;
         }
         .footer {
-            background-color: #f4f4f4;
+            background-color: #E0E0E5;
             color: #666666;
             text-align: center;
             padding: 10px;
@@ -42,22 +40,23 @@
         }
         .event-details {
             margin-bottom: 40px;
+	    color: #000000;
         }
         .event-details div {
             margin-bottom: 5px;
             align-items: flex-start;
             word-wrap: break-word;
-		}
+	}
         .event-details div .symbol {
-            margin-right: 10px;
-            color: #007BFF;
+            margin-right: 10px; /* Einheitlicher Abstand */
+            color: #0056b3;
             width: 20px;
             text-align: center;
             flex-shrink: 0;	
         }
         .event-details div i {
             margin-right: 15px;
-            color: #007BFF;
+            color: #0056b3;
             width: 20px;
             text-align: center;
             flex-shrink: 0;
@@ -75,10 +74,10 @@
         </div>
         <div class="content">
             <div class="event-details">		
-        				{{added_events}}
-        				{{modified_events}}
-        				{{removed_events}}
-			      </div>
+		{{added_events}}
+		{{modified_events}}
+		{{removed_events}}
+	    </div>
         </div>
         <div class="footer">
             {{footer}}
